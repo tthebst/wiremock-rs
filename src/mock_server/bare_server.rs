@@ -2,6 +2,7 @@ use crate::mock_server::hyper::run_server;
 use crate::mock_set::MockId;
 use crate::mock_set::MountedMockSet;
 use crate::{mock::Mock, verification::VerificationOutcome, Request};
+use rustls::ServerConfig;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -45,7 +46,11 @@ impl MockServerState {
 impl BareMockServer {
     /// Start a new instance of a `BareMockServer` listening on the specified
     /// [`TcpListener`](std::net::TcpListener).
-    pub(super) async fn start(listener: TcpListener, request_recording: RequestRecording) -> Self {
+    pub(super) async fn start(
+        listener: TcpListener,
+        request_recording: RequestRecording,
+        tls_config: Option<ServerConfig>,
+    ) -> Self {
         let (shutdown_trigger, shutdown_receiver) = tokio::sync::oneshot::channel();
         let received_requests = match request_recording {
             RequestRecording::Enabled => Some(Vec::new()),
@@ -61,7 +66,7 @@ impl BareMockServer {
 
         let server_state = state.clone();
         std::thread::spawn(move || {
-            let server_future = run_server(listener, server_state, shutdown_receiver);
+            let server_future = run_server(listener, server_state, tls_config, shutdown_receiver);
 
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
